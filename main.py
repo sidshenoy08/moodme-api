@@ -3,7 +3,7 @@ from typing import List
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from db import fetch_documents, Restaurant
+from db import fetch_documents, fetch_grades, Restaurant
 
 origins = [
     "http://localhost:3000"
@@ -21,6 +21,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+
+@app.get("/grades",
+        response_model=List,
+        response_description="Fetch unique grades")
+async def get_grades():
+    return await fetch_grades()
 
 @app.get("/restaurants", 
         response_model=List[Restaurant], 

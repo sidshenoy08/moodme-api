@@ -10,6 +10,8 @@ from pydantic.json_schema import JsonSchemaValue
 
 from datetime import datetime
 
+from statistics import mode, StatisticsError
+
 class PyObjectId(ObjectId):
 
     @classmethod
@@ -33,7 +35,7 @@ class Address(BaseModel):
     building: str
     street: str
 
-class Grade(BaseModel):
+class Review(BaseModel):
     date: datetime
     grade: str
     score: int
@@ -42,9 +44,11 @@ class Restaurant(BaseModel):
     id: Optional[PyObjectId] = Field(alias="_id")
     address: Address
     cuisine: str
-    grades: List[Grade]
+    grades: List[Review]
     name: str = Field(...)
     restaurant_id: str = Field(...)
+    full_address: Optional[str] = None
+    avg_grade: Optional[str] = None
 
     class Config:
         allow_population_by_field_name: True
@@ -53,16 +57,33 @@ class Restaurant(BaseModel):
             ObjectId: str
         }
 
+def compute_avggrade(reviews):
+    grade_list = []
+    for review in reviews:
+        grade_list.append(review.grade)
+    try:
+        return mode(grade_list)
+    except StatisticsError:
+        return "N/A"
+
 def fetch_collection():
     client = motor_asyncio.AsyncIOMotorClient()
     db = client.get_database("moodme")
     restaurants_collection = db.get_collection("restaurants")
     return restaurants_collection
 
+async def fetch_grades():
+    restaurants_collection = fetch_collection()
+    distinct_grades = await restaurants_collection.distinct("grades.grade")
+    return distinct_grades
+
 async def fetch_documents(page_number, limit):
-    restaurants = fetch_collection()
-    cursor = restaurants.find({}).skip((page_number - 1) * limit).limit(limit)
-    docs = []
-    async for document in cursor:
-        docs.append(Restaurant(**document))
-    return docs
+    restaurants_collection = fetch_collection()
+    restaurant_docs = restaurants_collection.find({}).skip((page_number - 1) * limit).limit(limit)
+    restaurants = []
+    async for restaurant in restaurant_docs:
+        curr_restaurant = Restaurant(**restaurant)
+        curr_restaurant.full_address = curr_restaurant.address.building + " " + curr_restaurant.address.street
+        curr_restaurant.avg_grade = compute_avggrade(curr_restaurant.grades)
+        restaurants.append(curr_restaurant)
+    return restaurants
