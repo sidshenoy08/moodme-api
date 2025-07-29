@@ -65,6 +65,26 @@ def compute_avggrade(reviews):
         return mode(grade_list)
     except StatisticsError:
         return "N/A"
+    
+def handle_filters(restaurant_name, address, cuisine):
+    filter_conditions = {}
+
+    if restaurant_name.strip():
+        filter_conditions["name"] = {"$regex": restaurant_name, "$options": "i"}
+    
+    if cuisine.strip():
+        filter_conditions["cuisine"] = {"$regex": cuisine, "$options": "i"}
+
+    if address.strip():
+        filter_conditions["$expr"] = {
+            "$regexMatch": {
+                "input": {"$concat": ["$address.building", " ", "$address.street"]},
+                "regex": address,
+                "options": "i"
+            }
+        }
+
+    return filter_conditions
 
 def fetch_collection():
     client = motor_asyncio.AsyncIOMotorClient()
@@ -77,9 +97,10 @@ async def fetch_grades():
     distinct_grades = await restaurants_collection.distinct("grades.grade")
     return distinct_grades
 
-async def fetch_documents(page_number, limit):
+async def fetch_documents(page_number, limit, restaurant_name, address, cuisine):
+    filter_conditions = handle_filters(restaurant_name=restaurant_name, address=address, cuisine=cuisine)
     restaurants_collection = fetch_collection()
-    restaurant_docs = restaurants_collection.find({}).skip((page_number - 1) * limit).limit(limit)
+    restaurant_docs = restaurants_collection.find(filter_conditions).skip((page_number - 1) * limit).limit(limit)
     restaurants = []
     async for restaurant in restaurant_docs:
         curr_restaurant = Restaurant(**restaurant)

@@ -31,9 +31,9 @@ async def get_grades():
 @app.get("/restaurants", 
         response_model=List[Restaurant], 
         response_description="Fetch restaurant data")
-async def fetch_restaurants(page_number: int = 1, limit: int = 10):
+async def fetch_restaurants(page_number: int = 1, limit: int = 10, restaurant_name: str = '', address: str = '', cuisine: str = ''):
     if (page_number <= 0):
         page_number = 1
     if (limit <= 0):
         limit = 10
-    return await fetch_documents(page_number, limit)
+    return await fetch_documents(page_number, limit, restaurant_name, address, cuisine)
